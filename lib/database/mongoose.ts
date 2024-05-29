@@ -24,7 +24,7 @@ if (!cached) {
     }
 }
 //Optimization
-export const connecToDatabase = async () => {
+export const connectToDatabase = async () => {
     //if there is a cached promise of a connection
     if (cached.conn) return cached.conn;
 
