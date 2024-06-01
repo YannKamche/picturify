@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 
-//import the same actions in user.action
+// Import the same actions in user.action
 import { createUser, deleteUser, updateUser } from "@/lib/actions/user.actions";
 
 export async function POST(req: Request) {
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
   // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    return new Response("Error occured -- no svix headers", {
+    return new Response("Error occurred -- no svix headers", {
       status: 400,
     });
   }
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     }) as WebhookEvent;
   } catch (err) {
     console.error("Error verifying webhook:", err);
-    return new Response("Error occured", {
+    return new Response("Error occurred", {
       status: 400,
     });
   }
@@ -58,60 +58,63 @@ export async function POST(req: Request) {
   const { id } = evt.data;
   const eventType = evt.type;
 
-  // CREATE : if the event is user created
-  if (eventType === "user.created") {
-    const { id, email_addresses, image_url, first_name, last_name, username } =
-      evt.data;
+  try {
+    // CREATE : if the event is user created
+    if (eventType === "user.created") {
+      const { email_addresses, image_url, first_name, last_name, username } =
+        evt.data;
 
-    const user = {
-      clerkId: id,
-      email: email_addresses[0].email_address,
-      username: username!,
-      firstName: first_name,
-      lastName: last_name,
-      photo: image_url,
-    };
+      const user = {
+        clerkId: id,
+        email: email_addresses[0].email_address,
+        username: username || "",
+        firstName: first_name || "",
+        lastName: last_name || "",
+        photo: image_url,
+      };
 
-    const newUser = await createUser(user);
+      const newUser = await createUser(user);
 
-    // Set public metadata
-    if (newUser) {
-      await clerkClient.users.updateUserMetadata(id, {
-        publicMetadata: {
-          userId: newUser._id,
-        },
-      });
+      // Set public metadata
+      if (newUser) {
+        await clerkClient.users.updateUserMetadata(id, {
+          publicMetadata: {
+            userId: newUser._id,
+          },
+        });
+      }
+
+      return NextResponse.json({ message: "OK", user: newUser });
     }
 
-    return NextResponse.json({ message: "OK", user: newUser });
+    // UPDATE
+    if (eventType === "user.updated") {
+      const { image_url, first_name, last_name, username } = evt.data;
+
+      const user = {
+        firstName: first_name || "",
+        lastName: last_name || "",
+        username: username || "",
+        photo: image_url,
+      };
+
+      const updatedUser = await updateUser(id, user);
+
+      return NextResponse.json({ message: "OK", user: updatedUser });
+    }
+
+    // DELETE
+    if (eventType === "user.deleted") {
+      const deletedUser = await deleteUser(id!);
+
+      return NextResponse.json({ message: "OK", user: deletedUser });
+    }
+  } catch (error) {
+    console.error("Error processing webhook event:", error);
+    return new Response("Internal Server Error", { status: 500 });
   }
 
-  // UPDATE
-  if (eventType === "user.updated") {
-    const { id, image_url, first_name, last_name, username } = evt.data;
-
-    const user = {
-      firstName: first_name,
-      lastName: last_name,
-      username: username!,
-      photo: image_url,
-    };
-
-    const updatedUser = await updateUser(id, user);
-
-    return NextResponse.json({ message: "OK", user: updatedUser });
-  }
-
-  // DELETE
-  if (eventType === "user.deleted") {
-    const { id } = evt.data;
-
-    const deletedUser = await deleteUser(id!);
-
-    return NextResponse.json({ message: "OK", user: deletedUser });
-  }
-
-  console.log(`Webhook with and ID of ${id} and type of ${eventType}`);
+  console.log(`Webhook with an ID of ${id} and type of ${eventType}`);
   console.log("Webhook body:", body);
 
   return new Response("", { status: 200 });
