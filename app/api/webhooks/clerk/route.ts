@@ -1,4 +1,5 @@
 /* eslint-disable camelcase */
+
 import { clerkClient } from "@clerk/nextjs/server";
 import { WebhookEvent } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
@@ -64,6 +65,10 @@ export async function POST(req: Request) {
       const { email_addresses, image_url, first_name, last_name, username } =
         evt.data;
 
+      if (!id) {
+        throw new Error("User ID is undefined");
+      }
+
       const user = {
         clerkId: id,
         email: email_addresses[0].email_address,
@@ -91,6 +96,10 @@ export async function POST(req: Request) {
     if (eventType === "user.updated") {
       const { image_url, first_name, last_name, username } = evt.data;
 
+      if (!id) {
+        throw new Error("User ID is undefined");
+      }
+
       const user = {
         firstName: first_name || "",
         lastName: last_name || "",
@@ -105,7 +114,11 @@ export async function POST(req: Request) {
 
     // DELETE
     if (eventType === "user.deleted") {
-      const deletedUser = await deleteUser(id!);
+      if (!id) {
+        throw new Error("User ID is undefined");
+      }
+
+      const deletedUser = await deleteUser(id);
 
       return NextResponse.json({ message: "OK", user: deletedUser });
     }
@@ -119,3 +132,4 @@ export async function POST(req: Request) {
 
   return new Response("", { status: 200 });
 }
+
